@@ -7,6 +7,7 @@ import {
   Clapperboard,
   Clock3,
   Film,
+  Heart,
   Play,
   Search,
   SlidersHorizontal,
@@ -14,6 +15,7 @@ import {
   Star,
   X,
 } from "lucide-react";
+import { AdminScreen, ProfileScreen } from "./AccountPages";
 import "./styles.css";
 
 const movies = [
@@ -170,29 +172,83 @@ function App() {
   const [query, setQuery] = useState("");
   const [genre, setGenre] = useState("All films");
   const [sort, setSort] = useState("Featured");
+  const [movieCatalog, setMovieCatalog] = useState(() =>
+    readStored("usepopcorn-movies", movies),
+  );
   const [watchlist, setWatchlist] = useState(() =>
     readStored("usepopcorn-watchlist", []),
+  );
+  const [favorites, setFavorites] = useState(() =>
+    readStored("usepopcorn-favorites", []),
+  );
+  const [watched, setWatched] = useState(() =>
+    readStored("usepopcorn-watched", []),
   );
   const [ratings, setRatings] = useState(() =>
     readStored("usepopcorn-ratings", {}),
   );
+  const [profile, setProfile] = useState(() =>
+    readStored("usepopcorn-profile", {
+      name: "Movie Fan",
+      email: "viewer@example.com",
+    }),
+  );
+  const [adminProfile, setAdminProfile] = useState(() =>
+    readStored("usepopcorn-admin-profile", {
+      name: "Cinema Admin",
+      email: "admin@example.com",
+    }),
+  );
   const [activeMovie, setActiveMovie] = useState(null);
   const [ratingDraft, setRatingDraft] = useState(0);
   const [view, setView] = useState("Discover");
+  const [collectionTab, setCollectionTab] = useState("Watchlist");
 
+  useEffect(
+    () =>
+      localStorage.setItem("usepopcorn-movies", JSON.stringify(movieCatalog)),
+    [movieCatalog],
+  );
   useEffect(
     () =>
       localStorage.setItem("usepopcorn-watchlist", JSON.stringify(watchlist)),
     [watchlist],
   );
   useEffect(
+    () =>
+      localStorage.setItem("usepopcorn-favorites", JSON.stringify(favorites)),
+    [favorites],
+  );
+  useEffect(
+    () => localStorage.setItem("usepopcorn-watched", JSON.stringify(watched)),
+    [watched],
+  );
+  useEffect(
     () => localStorage.setItem("usepopcorn-ratings", JSON.stringify(ratings)),
     [ratings],
   );
+  useEffect(
+    () => localStorage.setItem("usepopcorn-profile", JSON.stringify(profile)),
+    [profile],
+  );
+  useEffect(
+    () =>
+      localStorage.setItem(
+        "usepopcorn-admin-profile",
+        JSON.stringify(adminProfile),
+      ),
+    [adminProfile],
+  );
 
   const visibleMovies = useMemo(() => {
-    let result = movies.filter((movie) => {
-      const matchesView = view !== "Watchlist" || watchlist.includes(movie.id);
+    let result = movieCatalog.filter((movie) => {
+      const selectedList = {
+        Watchlist: watchlist,
+        Favorites: favorites,
+        Watched: watched,
+      }[collectionTab];
+      const matchesView =
+        view !== "Collection" || selectedList.includes(movie.id);
       const matchesGenre =
         genre === "All films" || movie.genres.includes(genre);
       const searchText =
@@ -209,7 +265,17 @@ function App() {
     if (sort === "A to Z")
       result = [...result].sort((a, b) => a.title.localeCompare(b.title));
     return result;
-  }, [genre, query, sort, view, watchlist]);
+  }, [
+    collectionTab,
+    favorites,
+    genre,
+    movieCatalog,
+    query,
+    sort,
+    view,
+    watched,
+    watchlist,
+  ]);
 
   function openMovie(movie) {
     setActiveMovie(movie);
@@ -228,6 +294,35 @@ function App() {
         ? current.filter((item) => item !== id)
         : [...current, id],
     );
+  const toggleFavorite = (id) =>
+    setFavorites((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id],
+    );
+  const toggleWatched = (id) =>
+    setWatched((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id],
+    );
+  const saveMovie = (movie) =>
+    setMovieCatalog((current) =>
+      current.some((item) => item.id === movie.id)
+        ? current.map((item) => (item.id === movie.id ? movie : item))
+        : [movie, ...current],
+    );
+  const deleteMovie = (id) => {
+    setMovieCatalog((current) => current.filter((movie) => movie.id !== id));
+    setWatchlist((current) => current.filter((movieId) => movieId !== id));
+    setFavorites((current) => current.filter((movieId) => movieId !== id));
+    setWatched((current) => current.filter((movieId) => movieId !== id));
+    setRatings((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  };
 
   return (
     <div className="app-shell">
@@ -253,244 +348,354 @@ function App() {
             Discover
           </button>
           <button
-            className={view === "Watchlist" ? "nav-link active" : "nav-link"}
-            onClick={() => setView("Watchlist")}
+            className={view === "Collection" ? "nav-link active" : "nav-link"}
+            onClick={() => {
+              setView("Collection");
+              setCollectionTab("Watchlist");
+            }}
           >
-            My watchlist <span className="nav-count">{watchlist.length}</span>
+            My collection <span className="nav-count">{watchlist.length}</span>
           </button>
         </nav>
-        <label className="search-box">
-          <Search size={17} aria-hidden="true" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Films, people, genres..."
-            aria-label="Search films, people, and genres"
-          />
-          <kbd>/</kbd>
-        </label>
+        {view !== "Profile" && view !== "Admin" && (
+          <label className="search-box">
+            <Search size={17} aria-hidden="true" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Films, people, genres..."
+              aria-label="Search films, people, and genres"
+            />
+            <kbd>/</kbd>
+          </label>
+        )}
         <button
           className="avatar"
-          title="Demo profile"
-          aria-label="Demo profile"
+          title="Open profile"
+          aria-label="Open profile"
+          onClick={() => setView("Profile")}
         >
-          C
+          {profile.name.trim().charAt(0).toUpperCase() || "U"}
         </button>
       </header>
 
       <main id="top">
-        {view === "Discover" && !query && genre === "All films" && (
-          <section className="feature" aria-label="Featured film">
-            <img className="feature-image" src={movies[0].backdrop} alt="" />
-            <div className="feature-shade" />
-            <div className="feature-content">
-              <div className="eyebrow">
-                <span className="eyebrow-dot" /> THE POPCORN PICK{" "}
-                <span className="eyebrow-line" />
-              </div>
-              <h1>
-                Some stories
-                <br />
-                stay with you.
-              </h1>
-              <p className="feature-caption">
-                A little longing. A life between lives.
-                <br />
-                This week, make room for <em>Past Lives.</em>
-              </p>
-              <div className="feature-meta">
-                <span className="score">
-                  <Star size={15} fill="currentColor" /> 4.8
-                </span>
-                <span>2023</span>
-                <span>Romance · Drama</span>
-                <span>1h 45m</span>
-              </div>
-              <div className="feature-actions">
-                <button
-                  className="button button-primary"
-                  onClick={() => openMovie(movies[0])}
-                >
-                  <Play size={15} fill="currentColor" /> Explore film
-                </button>
-                <button
-                  className="button button-quiet"
-                  onClick={() => toggleWatchlist(1)}
-                >
-                  {watchlist.includes(1) ? (
-                    <Check size={16} />
-                  ) : (
-                    <Bookmark size={16} />
-                  )}{" "}
-                  {watchlist.includes(1)
-                    ? "In your watchlist"
-                    : "Save for later"}
-                </button>
-              </div>
-            </div>
-            <div className="feature-index">
-              <span>01</span>
-              <i />
-              <span>04</span>
-            </div>
-            <span className="feature-credit">THE POPCORN PICK · 01 / 04</span>
-          </section>
+        {view === "Profile" && (
+          <ProfileScreen
+            profile={profile}
+            onSaveProfile={setProfile}
+            favorites={favorites}
+            watched={watched}
+            ratings={ratings}
+            movies={movieCatalog}
+            onOpenMovie={openMovie}
+            onRemoveFavorite={toggleFavorite}
+            onRemoveWatched={toggleWatched}
+            onOpenAdmin={() => setView("Admin")}
+          />
         )}
-
-        <section className="catalog-section">
-          <div className="catalog-heading">
-            <div>
-              <div className="section-kicker">
-                {view === "Watchlist"
-                  ? "YOUR PERSONAL SHELF"
-                  : "A GOOD PLACE TO START"}
-              </div>
-              <h2>
-                {view === "Watchlist"
-                  ? "Saved for later"
-                  : query || genre !== "All films"
-                    ? "Find your film"
-                    : "Worth your time"}
-                <span className="title-period">.</span>
-              </h2>
-            </div>
-            <div className="sort-control">
-              <SlidersHorizontal size={15} />
-              <select
-                value={sort}
-                onChange={(event) => setSort(event.target.value)}
-                aria-label="Sort films"
-              >
-                <option>Featured</option>
-                <option>Highest rated</option>
-                <option>Newest</option>
-                <option>A to Z</option>
-              </select>
-              <ChevronDown size={13} />
-            </div>
-          </div>
-          <div className="genre-row" role="group" aria-label="Filter by genre">
-            {genres.map((item) => (
-              <button
-                key={item}
-                className={
-                  genre === item ? "genre-chip selected" : "genre-chip"
-                }
-                onClick={() => setGenre(item)}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-          <div className="results-line">
-            <span>{visibleMovies.length} FILMS</span>
-            <span className="results-note">
-              <Sparkles size={13} /> Curated for the curious
-            </span>
-          </div>
-
-          {visibleMovies.length > 0 ? (
-            <div className="movie-grid">
-              {visibleMovies.map((movie, index) => (
-                <article
-                  className="movie-card"
-                  key={movie.id}
-                  style={{ "--card-index": index }}
-                >
-                  <button
-                    className="poster-button"
-                    onClick={() => openMovie(movie)}
-                    aria-label={`View ${movie.title}`}
-                  >
-                    <img
-                      className="poster"
-                      src={movie.poster}
-                      alt={`${movie.title} poster`}
-                      loading={index > 3 ? "lazy" : "eager"}
-                    />
-                    <span className="poster-gradient" />
-                    <span className="poster-rating">
-                      <Star size={12} fill="currentColor" />{" "}
-                      {movie.rating.toFixed(1)}
-                    </span>
-                    <span className="poster-open">
-                      <Play size={17} fill="currentColor" />
-                    </span>
-                  </button>
-                  <div className="card-copy">
-                    <div className="movie-title-row">
+        {view === "Admin" && (
+          <AdminScreen
+            profile={adminProfile}
+            onSaveProfile={setAdminProfile}
+            movies={movieCatalog}
+            ratings={ratings}
+            onSaveMovie={saveMovie}
+            onDeleteMovie={deleteMovie}
+            onExit={() => setView("Profile")}
+          />
+        )}
+        {(view === "Discover" || view === "Collection") && (
+          <>
+            {view === "Discover" &&
+              !query &&
+              genre === "All films" &&
+              movieCatalog.length > 0 && (
+                <section className="feature" aria-label="Featured film">
+                  <img
+                    className="feature-image"
+                    src={movieCatalog[0].backdrop}
+                    alt=""
+                  />
+                  <div className="feature-shade" />
+                  <div className="feature-content">
+                    <div className="eyebrow">
+                      <span className="eyebrow-dot" /> THE POPCORN PICK{" "}
+                      <span className="eyebrow-line" />
+                    </div>
+                    <h1>{movieCatalog[0].title}</h1>
+                    <p className="feature-caption">
+                      {movieCatalog[0].description}
+                    </p>
+                    <div className="feature-meta">
+                      <span className="score">
+                        <Star size={15} fill="currentColor" />{" "}
+                        {movieCatalog[0].rating || "New"}
+                      </span>
+                      <span>{movieCatalog[0].year}</span>
+                      <span>{movieCatalog[0].genres.join(" · ")}</span>
+                      <span>{movieCatalog[0].runtime}</span>
+                    </div>
+                    <div className="feature-actions">
                       <button
-                        className="movie-title"
-                        onClick={() => openMovie(movie)}
+                        className="button button-primary"
+                        onClick={() => openMovie(movieCatalog[0])}
                       >
-                        {movie.title}
+                        <Play size={15} fill="currentColor" /> Explore film
                       </button>
                       <button
-                        className={
-                          watchlist.includes(movie.id)
-                            ? "save-button saved"
-                            : "save-button"
-                        }
-                        onClick={() => toggleWatchlist(movie.id)}
-                        aria-label={
-                          watchlist.includes(movie.id)
-                            ? `Remove ${movie.title} from watchlist`
-                            : `Add ${movie.title} to watchlist`
-                        }
-                        title={
-                          watchlist.includes(movie.id)
-                            ? "Remove from watchlist"
-                            : "Add to watchlist"
-                        }
+                        className="button button-quiet"
+                        onClick={() => toggleWatchlist(movieCatalog[0].id)}
                       >
-                        {watchlist.includes(movie.id) ? (
+                        {watchlist.includes(movieCatalog[0].id) ? (
                           <Check size={16} />
                         ) : (
                           <Bookmark size={16} />
-                        )}
+                        )}{" "}
+                        {watchlist.includes(movieCatalog[0].id)
+                          ? "In your watchlist"
+                          : "Save for later"}
                       </button>
                     </div>
-                    <div className="movie-subtitle">
-                      {movie.year}
-                      <span>·</span>
-                      {movie.genres.slice(0, 2).join(" / ")}
-                    </div>
-                    {ratings[movie.id] && (
-                      <div className="your-rating">
-                        <Star size={11} fill="currentColor" /> YOUR RATING{" "}
-                        {ratings[movie.id]}/5
-                      </div>
-                    )}
                   </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state">
-              <Film size={25} />
-              <h3>
-                {view === "Watchlist"
-                  ? "Your shelf is waiting."
-                  : "No films found."}
-              </h3>
-              <p>
-                {view === "Watchlist"
-                  ? "Save a film that catches your eye and it will be here."
-                  : "Try another title, person, or genre."}
-              </p>
-              <button
-                className="text-button"
-                onClick={() => {
-                  setQuery("");
-                  setGenre("All films");
-                  if (view === "Watchlist") setView("Discover");
-                }}
+                  <div className="feature-index">
+                    <span>01</span>
+                    <i />
+                    <span>04</span>
+                  </div>
+                  <span className="feature-credit">
+                    THE POPCORN PICK · 01 / 04
+                  </span>
+                </section>
+              )}
+
+            <section className="catalog-section">
+              <div className="catalog-heading">
+                <div>
+                  <div className="section-kicker">
+                    {view === "Collection"
+                      ? "YOUR PERSONAL SHELF"
+                      : "A GOOD PLACE TO START"}
+                  </div>
+                  <h2>
+                    {view === "Collection"
+                      ? collectionTab === "Watchlist"
+                        ? "Saved for later"
+                        : collectionTab === "Favorites"
+                          ? "Favorite films"
+                          : "Films you have watched"
+                      : query || genre !== "All films"
+                        ? "Find your film"
+                        : "Worth your time"}
+                    <span className="title-period">.</span>
+                  </h2>
+                </div>
+                <div className="sort-control">
+                  <SlidersHorizontal size={15} />
+                  <select
+                    value={sort}
+                    onChange={(event) => setSort(event.target.value)}
+                    aria-label="Sort films"
+                  >
+                    <option>Featured</option>
+                    <option>Highest rated</option>
+                    <option>Newest</option>
+                    <option>A to Z</option>
+                  </select>
+                  <ChevronDown size={13} />
+                </div>
+              </div>
+              {view === "Collection" && (
+                <div
+                  className="collection-tabs"
+                  role="tablist"
+                  aria-label="Your movie lists"
+                >
+                  {["Watchlist", "Favorites", "Watched"].map((tab) => (
+                    <button
+                      key={tab}
+                      role="tab"
+                      aria-selected={collectionTab === tab}
+                      className={
+                        collectionTab === tab
+                          ? "collection-tab active"
+                          : "collection-tab"
+                      }
+                      onClick={() => setCollectionTab(tab)}
+                    >
+                      {tab}
+                      <span>
+                        {tab === "Watchlist"
+                          ? watchlist.length
+                          : tab === "Favorites"
+                            ? favorites.length
+                            : watched.length}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div
+                className="genre-row"
+                role="group"
+                aria-label="Filter by genre"
               >
-                Explore all films <span>→</span>
-              </button>
-            </div>
-          )}
-        </section>
+                {genres.map((item) => (
+                  <button
+                    key={item}
+                    className={
+                      genre === item ? "genre-chip selected" : "genre-chip"
+                    }
+                    onClick={() => setGenre(item)}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+              <div className="results-line">
+                <span>{visibleMovies.length} FILMS</span>
+                <span className="results-note">
+                  <Sparkles size={13} /> Curated for the curious
+                </span>
+              </div>
+
+              {visibleMovies.length > 0 ? (
+                <div className="movie-grid">
+                  {visibleMovies.map((movie, index) => (
+                    <article
+                      className="movie-card"
+                      key={movie.id}
+                      style={{ "--card-index": index }}
+                    >
+                      <button
+                        className="poster-button"
+                        onClick={() => openMovie(movie)}
+                        aria-label={`View ${movie.title}`}
+                      >
+                        <img
+                          className="poster"
+                          src={movie.poster}
+                          alt={`${movie.title} poster`}
+                          loading={index > 3 ? "lazy" : "eager"}
+                        />
+                        <span className="poster-gradient" />
+                        <span className="poster-rating">
+                          <Star size={12} fill="currentColor" />{" "}
+                          {movie.rating.toFixed(1)}
+                        </span>
+                        <span className="poster-open">
+                          <Play size={17} fill="currentColor" />
+                        </span>
+                      </button>
+                      <div className="card-copy">
+                        <div className="movie-title-row">
+                          <button
+                            className="movie-title"
+                            onClick={() => openMovie(movie)}
+                          >
+                            {movie.title}
+                          </button>
+                          <div className="movie-card-actions">
+                            <button
+                              className={
+                                favorites.includes(movie.id)
+                                  ? "save-button favorite-active"
+                                  : "save-button"
+                              }
+                              onClick={() => toggleFavorite(movie.id)}
+                              aria-label={
+                                favorites.includes(movie.id)
+                                  ? `Remove ${movie.title} from favorites`
+                                  : `Add ${movie.title} to favorites`
+                              }
+                              title={
+                                favorites.includes(movie.id)
+                                  ? "Remove favorite"
+                                  : "Add to favorites"
+                              }
+                            >
+                              <Heart
+                                size={16}
+                                fill={
+                                  favorites.includes(movie.id)
+                                    ? "currentColor"
+                                    : "none"
+                                }
+                              />
+                            </button>
+                            <button
+                              className={
+                                watchlist.includes(movie.id)
+                                  ? "save-button saved"
+                                  : "save-button"
+                              }
+                              onClick={() => toggleWatchlist(movie.id)}
+                              aria-label={
+                                watchlist.includes(movie.id)
+                                  ? `Remove ${movie.title} from watchlist`
+                                  : `Add ${movie.title} to watchlist`
+                              }
+                              title={
+                                watchlist.includes(movie.id)
+                                  ? "Remove from watchlist"
+                                  : "Add to watchlist"
+                              }
+                            >
+                              {watchlist.includes(movie.id) ? (
+                                <Check size={16} />
+                              ) : (
+                                <Bookmark size={16} />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="movie-subtitle">
+                          {movie.year}
+                          <span>·</span>
+                          {movie.genres.slice(0, 2).join(" / ")}
+                        </div>
+                        {ratings[movie.id] && (
+                          <div className="your-rating">
+                            <Star size={11} fill="currentColor" /> YOUR RATING{" "}
+                            {ratings[movie.id]}/5
+                          </div>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <Film size={25} />
+                  <h3>
+                    {view === "Collection" && collectionTab === "Watchlist"
+                      ? "Your shelf is waiting."
+                      : view === "Collection" && collectionTab === "Favorites"
+                        ? "No favorites saved yet."
+                        : view === "Collection" && collectionTab === "Watched"
+                          ? "Your watched list is empty."
+                          : "No films found."}
+                  </h3>
+                  <p>
+                    {view === "Collection"
+                      ? "Save a film that catches your eye and it will be here."
+                      : "Try another title, person, or genre."}
+                  </p>
+                  <button
+                    className="text-button"
+                    onClick={() => {
+                      setQuery("");
+                      setGenre("All films");
+                      if (view === "Collection") setView("Discover");
+                    }}
+                  >
+                    Explore all films <span>→</span>
+                  </button>
+                </div>
+              )}
+            </section>
+          </>
+        )}
       </main>
 
       <footer className="footer">
@@ -603,6 +808,31 @@ function App() {
                     <Bookmark size={15} />
                   )}
                   {watchlist.includes(activeMovie.id) ? "Saved" : "Watchlist"}
+                </button>
+                <button
+                  className="button button-outline"
+                  onClick={() => toggleFavorite(activeMovie.id)}
+                >
+                  <Heart
+                    size={15}
+                    fill={
+                      favorites.includes(activeMovie.id)
+                        ? "currentColor"
+                        : "none"
+                    }
+                  />
+                  {favorites.includes(activeMovie.id)
+                    ? "Favorite"
+                    : "Add favorite"}
+                </button>
+                <button
+                  className="button button-outline"
+                  onClick={() => toggleWatched(activeMovie.id)}
+                >
+                  <Check size={15} />
+                  {watched.includes(activeMovie.id)
+                    ? "Watched"
+                    : "Mark watched"}
                 </button>
               </div>
               <div className="ratings-footnote">
