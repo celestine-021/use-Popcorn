@@ -15,7 +15,7 @@ import {
   Star,
   X,
 } from "lucide-react";
-import { AdminScreen, ProfileScreen } from "./AccountPages";
+import { AdminLoginDialog, AdminScreen, ProfileScreen } from "./AccountPages";
 import "./styles.css";
 
 const movies = [
@@ -160,6 +160,8 @@ const genres = [
   "Animation",
   "Crime",
 ];
+const DEMO_ADMIN_PASSWORD = "123";
+const DEFAULT_ADMIN_NAME = "Celestine Wainaina";
 const readStored = (key, fallback) => {
   try {
     return JSON.parse(localStorage.getItem(key)) ?? fallback;
@@ -193,12 +195,17 @@ function App() {
       email: "viewer@example.com",
     }),
   );
-  const [adminProfile, setAdminProfile] = useState(() =>
-    readStored("usepopcorn-admin-profile", {
-      name: "Cinema Admin",
-      email: "admin@example.com",
-    }),
-  );
+  const [adminProfile, setAdminProfile] = useState(() => {
+    const storedProfile = readStored("usepopcorn-admin-profile", null);
+    if (!storedProfile) {
+      return { name: DEFAULT_ADMIN_NAME, email: "admin@example.com" };
+    }
+    return storedProfile.name === "Cinema Admin"
+      ? { ...storedProfile, name: DEFAULT_ADMIN_NAME }
+      : storedProfile;
+  });
+  const [adminLoginOpen, setAdminLoginOpen] = useState(false);
+  const [adminLoginError, setAdminLoginError] = useState("");
   const [activeMovie, setActiveMovie] = useState(null);
   const [ratingDraft, setRatingDraft] = useState(0);
   const [view, setView] = useState("Discover");
@@ -286,6 +293,19 @@ function App() {
     if (!activeMovie || !ratingDraft) return;
     setRatings((current) => ({ ...current, [activeMovie.id]: ratingDraft }));
     setActiveMovie(null);
+  }
+
+  function signInAdmin(credentials) {
+    const nameMatches =
+      credentials.name.trim().toLocaleLowerCase() ===
+      adminProfile.name.trim().toLocaleLowerCase();
+    if (!nameMatches || credentials.password !== DEMO_ADMIN_PASSWORD) {
+      setAdminLoginError("Admin name or password is incorrect.");
+      return;
+    }
+    setAdminLoginError("");
+    setAdminLoginOpen(false);
+    setView("Admin");
   }
 
   const toggleWatchlist = (id) =>
@@ -391,7 +411,10 @@ function App() {
             onOpenMovie={openMovie}
             onRemoveFavorite={toggleFavorite}
             onRemoveWatched={toggleWatched}
-            onOpenAdmin={() => setView("Admin")}
+            onOpenAdmin={() => {
+              setAdminLoginError("");
+              setAdminLoginOpen(true);
+            }}
           />
         )}
         {view === "Admin" && (
@@ -712,6 +735,15 @@ function App() {
           MADE FOR THE LOVE OF IT <span className="footer-star">✳</span>
         </span>
       </footer>
+
+      {adminLoginOpen && (
+        <AdminLoginDialog
+          adminName={adminProfile.name}
+          error={adminLoginError}
+          onClose={() => setAdminLoginOpen(false)}
+          onSubmit={signInAdmin}
+        />
+      )}
 
       {activeMovie && (
         <div

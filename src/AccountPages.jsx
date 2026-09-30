@@ -189,6 +189,79 @@ export function ProfileScreen({
   );
 }
 
+export function AdminLoginDialog({ adminName, error, onClose, onSubmit }) {
+  const [name, setName] = useState(adminName);
+  const [password, setPassword] = useState("");
+
+  function submit(event) {
+    event.preventDefault();
+    onSubmit({ name, password });
+  }
+
+  return (
+    <div
+      className="confirm-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        className="confirm-dialog admin-login-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="admin-login-title"
+      >
+        <span className="section-kicker">ADMINISTRATOR</span>
+        <h2 id="admin-login-title">Sign in to the studio</h2>
+        <p>Use the demo admin account to manage the movie catalog.</p>
+        <form className="admin-login-form" onSubmit={submit}>
+          <label>
+            Admin name
+            <input
+              required
+              autoComplete="username"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </label>
+          <label>
+            Password
+            <input
+              required
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+          {error && (
+            <p className="login-error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="editor-actions">
+            <button
+              type="button"
+              className="button button-outline"
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="button button-primary">
+              Sign in
+            </button>
+          </div>
+        </form>
+        <p className="demo-notice">
+          Demo-only sign-in. This browser-only password is not secure for
+          production.
+        </p>
+      </section>
+    </div>
+  );
+}
+
 const emptyMovie = {
   title: "",
   year: new Date().getFullYear(),

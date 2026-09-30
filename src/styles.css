@@ -1504,6 +1504,36 @@ a:focus-visible {
 .confirm-dialog .delete-button {
   border: 0;
 }
+.admin-login-form {
+  display: grid;
+  gap: 13px;
+  margin-top: 16px;
+}
+.admin-login-form label {
+  display: grid;
+  gap: 7px;
+  color: #a5a69d;
+  font-size: 10px;
+}
+.admin-login-form input {
+  width: 100%;
+  min-height: 39px;
+  padding: 0 11px;
+  border: 1px solid #34362f;
+  border-radius: 3px;
+  color: var(--paper);
+  background: #171815;
+  font-size: 12px;
+}
+.admin-login-form input:focus {
+  border-color: #777d5d;
+  outline: 0;
+}
+.login-error {
+  margin: 0;
+  color: #ff9a8f;
+  font-size: 10px;
+}
 .modal-actions {
   flex-wrap: wrap;
 }
